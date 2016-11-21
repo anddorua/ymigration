@@ -43,6 +43,12 @@ CREATE SCHEMA my_yacht;
 
 ALTER SCHEMA my_yacht OWNER TO postgres;
 
+
+CREATE ROLE manager;
+CREATE ROLE user_role;
+CREATE ROLE authenticator noinherit;
+GRANT manager TO authenticator;
+GRANT user_role TO authenticator;
 --
 -- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
 --
