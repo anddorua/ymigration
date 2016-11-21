@@ -1,0 +1,5 @@
+%syntax-version=1.0.0
+%project=ymigration
+
+appschema 2016-11-18T16:28:29Z Andriy Doroshenko <mapleukraine@gmail.com> # Adding schemas
+@v1.0.0-dev1 2016-11-21T13:28:20Z root <root@4003b84b92ac> # Tag v1.0.0-dev1.
