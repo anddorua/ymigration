@@ -43,7 +43,6 @@ CREATE SCHEMA my_yacht;
 
 ALTER SCHEMA my_yacht OWNER TO postgres;
 
-
 CREATE ROLE manager;
 CREATE ROLE user_role;
 CREATE ROLE authenticator noinherit;
