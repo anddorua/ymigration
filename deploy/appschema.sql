@@ -1,13 +1,12 @@
 -- Deploy appschema
 
 BEGIN;
-
 --
 -- PostgreSQL database dump
 --
 
 -- Dumped from database version 9.6.0
--- Dumped by pg_dump version 9.6.0
+-- Dumped by pg_dump version 9.6.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -48,29 +47,31 @@ CREATE ROLE user_role;
 CREATE ROLE authenticator noinherit;
 GRANT manager TO authenticator;
 GRANT user_role TO authenticator;
+
+
 --
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
+-- Name: plpgsql; Type: EXTENSION; Schema: -; Owner:
 --
 
 CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
 
 
 --
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner:
 --
 
 COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
 
 
 --
--- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: 
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner:
 --
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner:
 --
 
 COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
@@ -83,9 +84,9 @@ SET search_path = auth, pg_catalog;
 --
 
 CREATE TYPE jwt_claims AS (
-	role text,
-	email text,
-	exp integer
+  role text,
+  email text,
+  exp integer
 );
 
 
@@ -98,8 +99,8 @@ SET search_path = public, pg_catalog;
 --
 
 CREATE TYPE token_type_enum AS ENUM (
-    'validation',
-    'reset'
+  'validation',
+  'reset'
 );
 
 
@@ -112,8 +113,8 @@ SET search_path = auth, pg_catalog;
 --
 
 CREATE FUNCTION check_role_exists() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 begin
   if not exists (select 1 from pg_roles as r where r.rolname = new.role) then
     raise foreign_key_violation using message =
@@ -132,16 +133,16 @@ ALTER FUNCTION auth.check_role_exists() OWNER TO postgres;
 --
 
 CREATE FUNCTION clearance_for_role(u name) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   ok boolean;
 begin
   select exists (
-    select rolname
+      select rolname
       from pg_authid
-     where pg_has_role(current_user, oid, 'member')
-       and rolname = u
+      where pg_has_role(current_user, oid, 'member')
+            and rolname = u
   ) into ok;
   if not ok then
     raise invalid_password using message =
@@ -158,8 +159,8 @@ ALTER FUNCTION auth.clearance_for_role(u name) OWNER TO postgres;
 --
 
 CREATE FUNCTION current_email() RETURNS text
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 begin
   return current_setting('postgrest.claims.email');
 end;
@@ -173,8 +174,8 @@ ALTER FUNCTION auth.current_email() OWNER TO postgres;
 --
 
 CREATE FUNCTION encrypt_pass() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 begin
   if tg_op = 'INSERT' or new.password <> old.password then
     new.password = crypt(new.password, gen_salt('bf'));
@@ -191,20 +192,20 @@ ALTER FUNCTION auth.encrypt_pass() OWNER TO postgres;
 --
 
 CREATE FUNCTION send_validation() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   tok uuid;
 begin
   select gen_random_uuid() into tok;
   insert into auth.tokens (token, token_type, email)
-         values (tok, 'validation', new.email);
+  values (tok, 'validation', new.email);
   perform pg_notify('validate',
-    json_build_object(
-      'email', new.email,
-      'token', tok,
-      'token_type', 'validation'
-    )::text
+                    json_build_object(
+                        'email', new.email,
+                        'token', tok,
+                        'token_type', 'validation'
+                    )::text
   );
   return new;
 end
@@ -218,13 +219,13 @@ ALTER FUNCTION auth.send_validation() OWNER TO postgres;
 --
 
 CREATE FUNCTION user_role(ch_email text, password text) RETURNS name
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
- _role text;
+  _role text;
 begin
   select role from my_yacht.user as u
-    where u.email = user_role.ch_email and u.password = crypt(user_role.password, u.password) into _role;
+  where u.email = user_role.ch_email and u.password = crypt(user_role.password, u.password) into _role;
   return _role;
 end;
 $$;
@@ -239,8 +240,8 @@ SET search_path = my_yacht, pg_catalog;
 --
 
 CREATE FUNCTION login(email text, password text) RETURNS auth.jwt_claims
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   _role name;
   _verified boolean;
@@ -253,7 +254,7 @@ begin
   if _role is null then
     raise invalid_password using message = 'invalid user or password';
   end if;
-  
+
   -- check verified flag whether users
   -- have validated their emails
   _email := login.email;
@@ -264,7 +265,7 @@ begin
   --raise using message = _verified;
   select _role as role, login.email as email,
          extract(epoch from now())::integer + 60*60 as exp
-    into result;
+  into result;
   return result;
 end;
 $$;
@@ -277,24 +278,24 @@ ALTER FUNCTION my_yacht.login(email text, password text) OWNER TO postgres;
 --
 
 CREATE FUNCTION request_password_reset(email text) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   tok uuid;
 begin
   delete from auth.tokens
-   where token_type = 'reset'
-     and tokens.email = request_password_reset.email;
+  where token_type = 'reset'
+        and tokens.email = request_password_reset.email;
 
   select gen_random_uuid() into tok;
   insert into auth.tokens (token, token_type, email)
-         values (tok, 'reset', request_password_reset.email);
+  values (tok, 'reset', request_password_reset.email);
   perform pg_notify('reset',
-    json_build_object(
-      'email', request_password_reset.email,
-      'token', tok,
-      'token_type', 'reset'
-    )::text
+                    json_build_object(
+                        'email', request_password_reset.email,
+                        'token', tok,
+                        'token_type', 'reset'
+                    )::text
   );
 end;
 $$;
@@ -307,38 +308,38 @@ ALTER FUNCTION my_yacht.request_password_reset(email text) OWNER TO postgres;
 --
 
 CREATE FUNCTION reset_password(email text, token uuid, password text) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   tok uuid;
 begin
   if exists(select 1 from auth.tokens
-             where tokens.email = reset_password.email
-               and tokens.token = reset_password.token
-               and token_type = 'reset') then
+  where tokens.email = reset_password.email
+        and tokens.token = reset_password.token
+        and token_type = 'reset') then
     update my_yacht.users set password=reset_password.password
-     where users.email = reset_password.email;
+    where users.email = reset_password.email;
 
     delete from auth.tokens
-     where tokens.email = reset_password.email
-       and tokens.token = reset_password.token
-       and token_type = 'reset';
+    where tokens.email = reset_password.email
+          and tokens.token = reset_password.token
+          and token_type = 'reset';
   else
     raise invalid_password using message =
       'invalid user or token';
   end if;
   delete from auth.tokens
-   where token_type = 'reset'
-     and tokens.email = reset_password.email;
+  where token_type = 'reset'
+        and tokens.email = reset_password.email;
 
   select gen_random_uuid() into tok;
   insert into auth.tokens (token, token_type, email)
-         values (tok, 'reset', reset_password.email);
+  values (tok, 'reset', reset_password.email);
   perform pg_notify('reset',
-    json_build_object(
-      'email', reset_password.email,
-      'token', tok
-    )::text
+                    json_build_object(
+                        'email', reset_password.email,
+                        'token', tok
+                    )::text
   );
 end;
 $$;
@@ -351,10 +352,10 @@ ALTER FUNCTION my_yacht.reset_password(email text, token uuid, password text) OW
 --
 
 CREATE FUNCTION signup(firstname text, lastname text, email text, mobile text, password text) RETURNS void
-    LANGUAGE sql
-    AS $$
-  insert into my_yacht.users (firstname, lastname, email, mobile, password,role, discount) values
-    (signup.firstname, signup.lastname, signup.email, signup.mobile, signup.password, 'user_role', '0');
+LANGUAGE sql
+AS $$
+insert into my_yacht.users (firstname, lastname, email, mobile, password,role, discount) values
+  (signup.firstname, signup.lastname, signup.email, signup.mobile, signup.password, 'user_role', '0');
 $$;
 
 
@@ -365,14 +366,14 @@ ALTER FUNCTION my_yacht.signup(firstname text, lastname text, email text, mobile
 --
 
 CREATE FUNCTION update_users() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 begin
   if tg_op = 'INSERT' then
     perform auth.clearance_for_role(new.role);
 
     insert into my_yacht.user
-      (firstname,lastname,email,mobile,password,role,discount)
+    (firstname,lastname,email,mobile,password,role,discount)
     values
       (new.firstname, new.lastname, new.email, new.mobile, new.password, new.role,new.discount);
     return new;
@@ -389,13 +390,13 @@ begin
       password   = new.password,
       role   = new.role,
       discount   = new.discount
-      where email = old.email;
+    where email = old.email;
     return new;
   elsif tg_op = 'DELETE' then
     -- no need to check clearance for old.role (see previous case)
 
     delete from my_yacht.user
-     where email = old.email;
+    where email = old.email;
     return null;
   end if;
 end
@@ -411,24 +412,24 @@ SET search_path = public, pg_catalog;
 --
 
 CREATE FUNCTION request_password_reset(email text) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   tok uuid;
 begin
   delete from auth.tokens
-   where token_type = 'reset'
-     and tokens.email = request_password_reset.email;
+  where token_type = 'reset'
+        and tokens.email = request_password_reset.email;
 
   select gen_random_uuid() into tok;
   insert into auth.tokens (token, token_type, email)
-         values (tok, 'reset', request_password_reset.email);
+  values (tok, 'reset', request_password_reset.email);
   perform pg_notify('reset',
-    json_build_object(
-      'email', request_password_reset.email,
-      'token', tok,
-      'token_type', 'reset'
-    )::text
+                    json_build_object(
+                        'email', request_password_reset.email,
+                        'token', tok,
+                        'token_type', 'reset'
+                    )::text
   );
 end;
 $$;
@@ -441,38 +442,38 @@ ALTER FUNCTION public.request_password_reset(email text) OWNER TO postgres;
 --
 
 CREATE FUNCTION reset_password(email text, token uuid, pass text) RETURNS void
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 declare
   tok uuid;
 begin
   if exists(select 1 from auth.tokens
-             where tokens.email = reset_password.email
-               and tokens.token = reset_password.token
-               and token_type = 'reset') then
+  where tokens.email = reset_password.email
+        and tokens.token = reset_password.token
+        and token_type = 'reset') then
     update auth.users set pass=reset_password.pass
-     where users.email = reset_password.email;
+    where users.email = reset_password.email;
 
     delete from auth.tokens
-     where tokens.email = reset_password.email
-       and tokens.token = reset_password.token
-       and token_type = 'reset';
+    where tokens.email = reset_password.email
+          and tokens.token = reset_password.token
+          and token_type = 'reset';
   else
     raise invalid_password using message =
       'invalid user or token';
   end if;
   delete from auth.tokens
-   where token_type = 'reset'
-     and tokens.email = reset_password.email;
+  where token_type = 'reset'
+        and tokens.email = reset_password.email;
 
   select gen_random_uuid() into tok;
   insert into auth.tokens (token, token_type, email)
-         values (tok, 'reset', reset_password.email);
+  values (tok, 'reset', reset_password.email);
   perform pg_notify('reset',
-    json_build_object(
-      'email', reset_password.email,
-      'token', tok
-    )::text
+                    json_build_object(
+                        'email', reset_password.email,
+                        'token', tok
+                    )::text
   );
 end;
 $$;
@@ -485,10 +486,10 @@ ALTER FUNCTION public.reset_password(email text, token uuid, pass text) OWNER TO
 --
 
 CREATE FUNCTION signup(email text, pass text) RETURNS void
-    LANGUAGE sql
-    AS $$
-  insert into auth.users (email, pass, role) values
-    (signup.email, signup.pass, 'hardcoded-role-here');
+LANGUAGE sql
+AS $$
+insert into auth.users (email, pass, role) values
+  (signup.email, signup.pass, 'hardcoded-role-here');
 $$;
 
 
@@ -499,17 +500,17 @@ ALTER FUNCTION public.signup(email text, pass text) OWNER TO postgres;
 --
 
 CREATE FUNCTION update_users() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
+LANGUAGE plpgsql
+AS $$
 begin
   if tg_op = 'INSERT' then
     perform auth.clearance_for_role(new.role);
 
     insert into auth.users
-      (role, pass, email, verified)
+    (role, pass, email, verified)
     values
       (new.role, new.pass, new.email,
-      coalesce(new.verified, false));
+       coalesce(new.verified, false));
     return new;
   elsif tg_op = 'UPDATE' then
     -- no need to check clearance for old.role because
@@ -521,13 +522,13 @@ begin
       role   = new.role,
       pass   = new.pass,
       verified = coalesce(new.verified, old.verified, false)
-      where email = old.email;
+    where email = old.email;
     return new;
   elsif tg_op = 'DELETE' then
     -- no need to check clearance for old.role (see previous case)
 
     delete from auth.users
-     where auth.email = old.email;
+    where auth.email = old.email;
     return null;
   end if;
 end
@@ -547,10 +548,10 @@ SET default_with_oids = false;
 --
 
 CREATE TABLE tokens (
-    token uuid NOT NULL,
-    token_type public.token_type_enum NOT NULL,
-    email text NOT NULL,
-    created_at timestamp with time zone DEFAULT ('now'::text)::date NOT NULL
+  token uuid NOT NULL,
+  token_type public.token_type_enum NOT NULL,
+  email text NOT NULL,
+  created_at timestamp with time zone DEFAULT ('now'::text)::date NOT NULL
 );
 
 
@@ -561,13 +562,13 @@ ALTER TABLE tokens OWNER TO postgres;
 --
 
 CREATE TABLE users (
-    email text NOT NULL,
-    pass text NOT NULL,
-    role name NOT NULL,
-    verified boolean DEFAULT false NOT NULL,
-    CONSTRAINT users_email_check CHECK ((email ~* '^.+@.+\..+$'::text)),
-    CONSTRAINT users_pass_check CHECK ((length(pass) < 512)),
-    CONSTRAINT users_role_check CHECK ((length((role)::text) < 512))
+  email text NOT NULL,
+  pass text NOT NULL,
+  role name NOT NULL,
+  verified boolean DEFAULT false NOT NULL,
+  CONSTRAINT users_email_check CHECK ((email ~* '^.+@.+\..+$'::text)),
+  CONSTRAINT users_pass_check CHECK ((length(pass) < 512)),
+  CONSTRAINT users_role_check CHECK ((length((role)::text) < 512))
 );
 
 
@@ -580,13 +581,13 @@ SET search_path = my_yacht, pg_catalog;
 --
 
 CREATE TABLE additional (
-    id integer NOT NULL,
-    booking_id integer NOT NULL,
-    extras_id integer,
-    packages_id integer,
-    guests integer NOT NULL,
-    amount integer NOT NULL,
-    money money
+  id integer NOT NULL,
+  booking_id integer NOT NULL,
+  extras_id integer,
+  packages_id integer,
+  guests integer NOT NULL,
+  amount integer NOT NULL,
+  money money
 );
 
 
@@ -597,11 +598,11 @@ ALTER TABLE additional OWNER TO postgres;
 --
 
 CREATE SEQUENCE additional_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE additional_id_seq OWNER TO postgres;
@@ -618,13 +619,15 @@ ALTER SEQUENCE additional_id_seq OWNED BY additional.id;
 --
 
 CREATE TABLE booking (
-    id integer NOT NULL,
-    y_id integer NOT NULL,
-    start_date date NOT NULL,
-    end_date date NOT NULL,
-    user_id integer NOT NULL,
-    payment money,
-    status integer NOT NULL
+  id integer NOT NULL,
+  y_id integer NOT NULL,
+  start_date date NOT NULL,
+  end_date date NOT NULL,
+  user_id integer NOT NULL,
+  payment money,
+  status integer NOT NULL,
+  payment_type character varying(80) NOT NULL,
+  discount numeric(2,2)
 );
 
 
@@ -635,11 +638,11 @@ ALTER TABLE booking OWNER TO postgres;
 --
 
 CREATE SEQUENCE booking_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE booking_id_seq OWNER TO postgres;
@@ -656,10 +659,10 @@ ALTER SEQUENCE booking_id_seq OWNED BY booking.id;
 --
 
 CREATE TABLE devices (
-    id integer NOT NULL,
-    user_id integer NOT NULL,
-    platform character varying(45) NOT NULL,
-    device_id character varying(45) NOT NULL
+  id integer NOT NULL,
+  user_id integer NOT NULL,
+  platform character varying(45) NOT NULL,
+  device_id character varying(45) NOT NULL
 );
 
 
@@ -670,11 +673,11 @@ ALTER TABLE devices OWNER TO postgres;
 --
 
 CREATE SEQUENCE devices_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE devices_id_seq OWNER TO postgres;
@@ -691,9 +694,9 @@ ALTER SEQUENCE devices_id_seq OWNED BY devices.id;
 --
 
 CREATE TABLE download (
-    id integer NOT NULL,
-    tagline character varying(80) NOT NULL,
-    filename text NOT NULL
+  id integer NOT NULL,
+  tagline character varying(80) NOT NULL,
+  filename text NOT NULL
 );
 
 
@@ -704,11 +707,11 @@ ALTER TABLE download OWNER TO postgres;
 --
 
 CREATE SEQUENCE download_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE download_id_seq OWNER TO postgres;
@@ -725,12 +728,13 @@ ALTER SEQUENCE download_id_seq OWNED BY download.id;
 --
 
 CREATE TABLE extras (
-    id integer NOT NULL,
-    title character varying(45) NOT NULL,
-    price money NOT NULL,
-    min_charge integer NOT NULL,
-    unit character varying(45) NOT NULL,
-    terms character varying(255) NOT NULL
+  id integer NOT NULL,
+  title character varying(45) NOT NULL,
+  price money NOT NULL,
+  min_charge integer NOT NULL,
+  unit character varying(45) NOT NULL,
+  terms character varying(255) NOT NULL,
+  status boolean DEFAULT true
 );
 
 
@@ -741,11 +745,11 @@ ALTER TABLE extras OWNER TO postgres;
 --
 
 CREATE SEQUENCE extras_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE extras_id_seq OWNER TO postgres;
@@ -762,10 +766,10 @@ ALTER SEQUENCE extras_id_seq OWNED BY extras.id;
 --
 
 CREATE TABLE file (
-    id integer NOT NULL,
-    type character varying(45) NOT NULL,
-    url text NOT NULL,
-    y_id integer NOT NULL
+  id integer NOT NULL,
+  type character varying(45) NOT NULL,
+  url text NOT NULL,
+  y_id integer NOT NULL
 );
 
 
@@ -776,11 +780,11 @@ ALTER TABLE file OWNER TO postgres;
 --
 
 CREATE SEQUENCE file_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE file_id_seq OWNER TO postgres;
@@ -797,16 +801,16 @@ ALTER SEQUENCE file_id_seq OWNED BY file.id;
 --
 
 CREATE TABLE invoice (
-    id integer NOT NULL,
-    booking_id integer NOT NULL,
-    invoice_num integer NOT NULL,
-    title text NOT NULL,
-    amount integer NOT NULL,
-    rate money NOT NULL,
-    subtotal money NOT NULL,
-    total money,
-    status boolean,
-    invoice_date date NOT NULL
+  id integer NOT NULL,
+  booking_id integer NOT NULL,
+  invoice_num integer NOT NULL,
+  title text NOT NULL,
+  amount integer NOT NULL,
+  rate money NOT NULL,
+  subtotal money NOT NULL,
+  total money,
+  status boolean,
+  invoice_date date NOT NULL
 );
 
 
@@ -817,11 +821,11 @@ ALTER TABLE invoice OWNER TO postgres;
 --
 
 CREATE SEQUENCE invoice_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE invoice_id_seq OWNER TO postgres;
@@ -838,11 +842,13 @@ ALTER SEQUENCE invoice_id_seq OWNED BY invoice.id;
 --
 
 CREATE TABLE packages (
-    id integer NOT NULL,
-    title character varying(45) NOT NULL,
-    price money NOT NULL,
-    min_charge integer NOT NULL,
-    description character varying(255)
+  id integer NOT NULL,
+  title character varying(45) NOT NULL,
+  price money NOT NULL,
+  min_charge integer NOT NULL,
+  description character varying(255),
+  y_id integer,
+  status boolean DEFAULT true
 );
 
 
@@ -853,11 +859,11 @@ ALTER TABLE packages OWNER TO postgres;
 --
 
 CREATE SEQUENCE packages_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE packages_id_seq OWNER TO postgres;
@@ -874,11 +880,11 @@ ALTER SEQUENCE packages_id_seq OWNED BY packages.id;
 --
 
 CREATE TABLE payment (
-    id integer NOT NULL,
-    invoice_id integer NOT NULL,
-    type character varying(45) NOT NULL,
-    user_id integer NOT NULL,
-    value money
+  id integer NOT NULL,
+  invoice_id integer NOT NULL,
+  type character varying(45) NOT NULL,
+  user_id integer NOT NULL,
+  value money
 );
 
 
@@ -889,11 +895,11 @@ ALTER TABLE payment OWNER TO postgres;
 --
 
 CREATE SEQUENCE payment_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE payment_id_seq OWNER TO postgres;
@@ -910,16 +916,16 @@ ALTER SEQUENCE payment_id_seq OWNED BY payment.id;
 --
 
 CREATE TABLE "user" (
-    id integer NOT NULL,
-    firstname character varying(80),
-    lastname character varying(80) NOT NULL,
-    email character varying(255) NOT NULL,
-    mobile character varying(16) NOT NULL,
-    password character varying(64) NOT NULL,
-    role character varying(45) NOT NULL,
-    discount numeric(2,2) DEFAULT 0,
-    CONSTRAINT chk_email CHECK (((email)::text ~* '^.+@.+\..+$'::text)),
-    CONSTRAINT chk_pass CHECK ((length((password)::text) < 65))
+  id integer NOT NULL,
+  firstname character varying(80),
+  lastname character varying(80) NOT NULL,
+  email character varying(255) NOT NULL,
+  mobile character varying(16) NOT NULL,
+  password character varying(64) NOT NULL,
+  role character varying(45) NOT NULL,
+  discount numeric(2,2) DEFAULT 0,
+  CONSTRAINT chk_email CHECK (((email)::text ~* '^.+@.+\..+$'::text)),
+  CONSTRAINT chk_pass CHECK ((length((password)::text) < 65))
 );
 
 
@@ -930,11 +936,11 @@ ALTER TABLE "user" OWNER TO postgres;
 --
 
 CREATE SEQUENCE user_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE user_id_seq OWNER TO postgres;
@@ -951,17 +957,17 @@ ALTER SEQUENCE user_id_seq OWNED BY "user".id;
 --
 
 CREATE VIEW users AS
- SELECT actual.firstname,
+  SELECT actual.firstname,
     actual.lastname,
     actual.email,
     actual.mobile,
     '***'::text AS password,
     actual.role,
     actual.discount
-   FROM "user" actual,
+  FROM "user" actual,
     ( SELECT pg_authid.rolname
-           FROM pg_authid
-          WHERE pg_has_role("current_user"(), pg_authid.oid, 'member'::text)) member_of
+      FROM pg_authid
+      WHERE pg_has_role("current_user"(), pg_authid.oid, 'member'::text)) member_of
   WHERE ((actual.role)::name = member_of.rolname);
 
 
@@ -972,10 +978,10 @@ ALTER TABLE users OWNER TO postgres;
 --
 
 CREATE TABLE yacht (
-    id integer NOT NULL,
-    title character varying(255) NOT NULL,
-    content text NOT NULL,
-    readmore text NOT NULL
+  id integer NOT NULL,
+  title character varying(255) NOT NULL,
+  content text NOT NULL,
+  readmore text NOT NULL
 );
 
 
@@ -986,11 +992,11 @@ ALTER TABLE yacht OWNER TO postgres;
 --
 
 CREATE SEQUENCE yacht_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+START WITH 1
+INCREMENT BY 1
+NO MINVALUE
+NO MAXVALUE
+CACHE 1;
 
 
 ALTER TABLE yacht_id_seq OWNER TO postgres;
@@ -1004,23 +1010,21 @@ ALTER SEQUENCE yacht_id_seq OWNED BY yacht.id;
 
 SET search_path = public, pg_catalog;
 
---
--- Name: users; Type: VIEW; Schema: public; Owner: postgres
---
-
 CREATE VIEW users AS
- SELECT actual.role,
+  SELECT actual.role,
     '***'::text AS pass,
     actual.email,
     actual.verified
-   FROM auth.users actual,
+  FROM auth.users actual,
     ( SELECT pg_authid.rolname
-           FROM pg_authid
-          WHERE pg_has_role("current_user"(), pg_authid.oid, 'member'::text)) member_of
+      FROM pg_authid
+      WHERE pg_has_role("current_user"(), pg_authid.oid, 'member'::text)) member_of
   WHERE (actual.role = member_of.rolname);
 
 
 ALTER TABLE users OWNER TO postgres;
+
+SET search_path = pg_catalog;
 
 SET search_path = my_yacht, pg_catalog;
 
@@ -1110,6 +1114,7 @@ SET search_path = auth, pg_catalog;
 COPY tokens (token, token_type, email, created_at) FROM stdin;
 37644957-6c04-4f7d-bf5c-c0aea78aebf7	reset	orionla2@new.com	2016-11-17 00:00:00+00
 5fde4cc6-2b5b-4690-9cc6-e537189e9bb5	reset	orion@new.com	2016-11-17 00:00:00+00
+75112c3c-e527-43c3-969c-fd82a209372e	reset	test@new.com	2016-11-21 00:00:00+00
 \.
 
 
@@ -1144,7 +1149,7 @@ SELECT pg_catalog.setval('additional_id_seq', 1, false);
 -- Data for Name: booking; Type: TABLE DATA; Schema: my_yacht; Owner: postgres
 --
 
-COPY booking (id, y_id, start_date, end_date, user_id, payment, status) FROM stdin;
+COPY booking (id, y_id, start_date, end_date, user_id, payment, status, payment_type, discount) FROM stdin;
 \.
 
 
@@ -1189,7 +1194,7 @@ SELECT pg_catalog.setval('download_id_seq', 1, false);
 -- Data for Name: extras; Type: TABLE DATA; Schema: my_yacht; Owner: postgres
 --
 
-COPY extras (id, title, price, min_charge, unit, terms) FROM stdin;
+COPY extras (id, title, price, min_charge, unit, terms, status) FROM stdin;
 \.
 
 
@@ -1234,7 +1239,7 @@ SELECT pg_catalog.setval('invoice_id_seq', 1, false);
 -- Data for Name: packages; Type: TABLE DATA; Schema: my_yacht; Owner: postgres
 --
 
-COPY packages (id, title, price, min_charge, description) FROM stdin;
+COPY packages (id, title, price, min_charge, description, y_id, status) FROM stdin;
 \.
 
 
@@ -1267,6 +1272,7 @@ SELECT pg_catalog.setval('payment_id_seq', 1, false);
 COPY "user" (id, firstname, lastname, email, mobile, password, role, discount) FROM stdin;
 14	Andrew	Markov	orionla2@new.com	123456789	$2a$06$xdp6B5MgmeYlTYj5ghe3qO1itZImMIHaulqr2NuyyKp1r2sWXv/za	user_role	0.00
 15	Andrew	test	orion@new.com	123456789	$2a$06$bpPg0sUad/EOfY69h9yfWuAMoHSolUZ.dkvUBpzI5AYdKED3NJP7W	user_role	0.00
+18	Orion	test	test@new.com	123456789	$2a$06$U.yTXoJ5Jo5nnJywGK2eJuUYcD8nJPSIrlfsa/50sqxmFGN3QE2cK	user_role	0.00
 \.
 
 
@@ -1274,7 +1280,7 @@ COPY "user" (id, firstname, lastname, email, mobile, password, role, discount) F
 -- Name: user_id_seq; Type: SEQUENCE SET; Schema: my_yacht; Owner: postgres
 --
 
-SELECT pg_catalog.setval('user_id_seq', 15, true);
+SELECT pg_catalog.setval('user_id_seq', 18, true);
 
 
 --
@@ -1291,6 +1297,11 @@ COPY yacht (id, title, content, readmore) FROM stdin;
 --
 
 SELECT pg_catalog.setval('yacht_id_seq', 1, true);
+
+
+SET search_path = public, pg_catalog;
+
+SET search_path = pg_catalog;
 
 
 SET search_path = auth, pg_catalog;
@@ -1407,6 +1418,9 @@ ALTER TABLE ONLY yacht
 
 ALTER TABLE ONLY "user"
     ADD CONSTRAINT unq_email UNIQUE (email);
+
+
+SET search_path = pg_catalog;
 
 
 SET search_path = auth, pg_catalog;
@@ -1541,6 +1555,8 @@ ALTER TABLE ONLY payment
     ADD CONSTRAINT fk_payment_user FOREIGN KEY (user_id) REFERENCES "user"(id);
 
 
+SET search_path = pg_catalog;
+
 --
 -- Name: auth; Type: ACL; Schema: -; Owner: postgres
 --
@@ -1556,6 +1572,8 @@ GRANT USAGE ON SCHEMA auth TO user_role;
 GRANT USAGE ON SCHEMA my_yacht TO manager;
 GRANT USAGE ON SCHEMA my_yacht TO user_role;
 
+
+SET search_path = my_yacht, pg_catalog;
 
 --
 -- Name: request_password_reset(text); Type: ACL; Schema: my_yacht; Owner: postgres
