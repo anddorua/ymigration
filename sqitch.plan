@@ -7,3 +7,8 @@ appschema 2016-11-18T16:28:29Z Andriy Doroshenko <mapleukraine@gmail.com> # Addi
 @v1.0.0-dev3 2016-11-24T12:45:00Z root <root@e43b902571be> # Tag v1.0.0-dev3
 
 modify_packages [appschema] 2016-11-24T16:49:31Z root <root@e43b902571be> # Adds unit column to packages
+@v1.0.0-dev4 2016-12-02T15:57:58Z root <root@081905fb7d15> # Tag v1.0.0-dev4.
+modify_packages [modify_packages@v1.0.0-dev4 appschema] 2016-12-02T16:02:29Z root <root@081905fb7d15># new database schema.
+@v1.0.0-dev5 2016-12-02T16:12:15Z root <root@081905fb7d15> # Tag v1.0.0-dev5.
+appschema [appschema@v1.0.0-dev5] 2016-12-02T16:13:31Z root <root@081905fb7d15># new database schema.
+@v1.0.0-dev6 2016-12-02T16:22:12Z root <root@081905fb7d15> # Tag v1.0.0-dev6.

@@ -1,9 +1,8 @@
--- Deploy modify_packages
--- requires: appschema
+-- Revert modify_packages
 
 BEGIN;
 
--- XXX Nothing to do.
+-- XXX Add DDLs here.
 ALTER TABLE my_yacht.packages drop COLUMN if exists unit cascade;
 
 COMMIT;
