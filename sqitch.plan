@@ -12,3 +12,5 @@ modify_packages [modify_packages@v1.0.0-dev4 appschema] 2016-12-02T16:02:29Z roo
 @v1.0.0-dev5 2016-12-02T16:12:15Z root <root@081905fb7d15> # Tag v1.0.0-dev5.
 appschema [appschema@v1.0.0-dev5] 2016-12-02T16:13:31Z root <root@081905fb7d15># new database schema.
 @v1.0.0-dev6 2016-12-02T16:22:12Z root <root@081905fb7d15> # Tag v1.0.0-dev6.
+
+v20161212 [appschema modify_packages] 2016-12-12T13:54:53Z root <root@be5f43b59dca> # next generation

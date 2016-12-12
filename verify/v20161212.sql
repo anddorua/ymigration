@@ -1,4 +1,4 @@
--- Verify appschema
+-- Verify ymigration:v20161212 on pg
 
 BEGIN;
 

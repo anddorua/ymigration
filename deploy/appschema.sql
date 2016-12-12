@@ -106,9 +106,12 @@ ALTER SCHEMA my_yacht OWNER TO postgres;
 CREATE ROLE manager;
 CREATE ROLE user_role;
 CREATE ROLE guest;
-CREATE ROLE authenticator noinherit;
+CREATE ROLE authenticator LOGIN
+ENCRYPTED PASSWORD 'md5b8d79b0dea1de1788ea7dd39fa0ec195'
+NOSUPERUSER NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
 GRANT manager TO authenticator;
 GRANT user_role TO authenticator;
+GRANT guest TO authenticator;
 -- ======================= /copy this to other deploy ============================ ---
 
 --
